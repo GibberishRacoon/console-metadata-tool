@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.Text;
+using FirebirdSql.Data.FirebirdClient;
+using System.Collections.Generic;
 
 namespace DbMetaTool
 {
@@ -81,12 +84,22 @@ namespace DbMetaTool
         /// </summary>
         public static void BuildDatabase(string databaseDirectory, string scriptsDirectory)
         {
-            // TODO:
-            // 1) Utwórz pustą bazę danych FB 5.0 w katalogu databaseDirectory.
-            // 2) Wczytaj i wykonaj kolejno skrypty z katalogu scriptsDirectory
-            //    (tylko domeny, tabele, procedury).
-            // 3) Obsłuż błędy i wyświetl raport.
-            throw new NotImplementedException();
+            Directory.CreateDirectory(databaseDirectory);
+
+            string dbPath = Path.Combine(databaseDirectory, "database.fdb");
+            string connectionString = $"DataSource=localhost;Port=3050;User=SYSDBA;Password=masterkey;" +
+                                     $"Database={dbPath};Charset=UTF8;";
+
+            FbConnection.CreateDatabase(connectionString, overwrite: true);
+
+            using (var connection = new FbConnection(connectionString))
+            {
+                connection.Open();
+
+                DatabaseHelpers.ExecuteScriptFile(connection, Path.Combine(scriptsDirectory, "domains.sql"));
+                DatabaseHelpers.ExecuteScriptFile(connection, Path.Combine(scriptsDirectory, "tables.sql"));
+                DatabaseHelpers.ExecuteScriptFile(connection, Path.Combine(scriptsDirectory, "procedures.sql"));
+            }
         }
 
         /// <summary>
@@ -94,11 +107,21 @@ namespace DbMetaTool
         /// </summary>
         public static void ExportScripts(string connectionString, string outputDirectory)
         {
-            // TODO:
-            // 1) Połącz się z bazą danych przy użyciu connectionString.
-            // 2) Pobierz metadane domen, tabel (z kolumnami) i procedur.
-            // 3) Wygeneruj pliki .sql / .json / .txt w outputDirectory.
-            throw new NotImplementedException();
+            Directory.CreateDirectory(outputDirectory);
+
+            using (var connection = new FbConnection(connectionString))
+            {
+                connection.Open();
+
+                string domains = DatabaseHelpers.ExtractDomains(connection);
+                File.WriteAllText(Path.Combine(outputDirectory, "domains.sql"), domains);
+
+                string tables = DatabaseHelpers.ExtractTables(connection);
+                File.WriteAllText(Path.Combine(outputDirectory, "tables.sql"), tables);
+
+                string procedures = DatabaseHelpers.ExtractProcedures(connection);
+                File.WriteAllText(Path.Combine(outputDirectory, "procedures.sql"), procedures);
+            }
         }
 
         /// <summary>
@@ -106,11 +129,14 @@ namespace DbMetaTool
         /// </summary>
         public static void UpdateDatabase(string connectionString, string scriptsDirectory)
         {
-            // TODO:
-            // 1) Połącz się z bazą danych przy użyciu connectionString.
-            // 2) Wykonaj skrypty z katalogu scriptsDirectory (tylko obsługiwane elementy).
-            // 3) Zadbaj o poprawną kolejność i bezpieczeństwo zmian.
-            throw new NotImplementedException();
+            using (var connection = new FbConnection(connectionString))
+            {
+                connection.Open();
+
+                DatabaseHelpers.ExecuteScriptFile(connection, Path.Combine(scriptsDirectory, "domains.sql"));
+                DatabaseHelpers.ExecuteScriptFile(connection, Path.Combine(scriptsDirectory, "tables.sql"));
+                DatabaseHelpers.ExecuteScriptFile(connection, Path.Combine(scriptsDirectory, "procedures.sql"));
+            }
         }
     }
 }
